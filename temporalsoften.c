@@ -86,9 +86,12 @@ void there_is_only_c_accumulate_line_mode2(uint8_t* dstp, const uint8_t** srcp, 
          dstp_pixel16 = sadd16(dstp_pixel16, bitwise_or);
       }
       int32_t dstp_pixel32 = dstp_pixel16;
-      dstp_pixel32 = dstp_pixel32 * div;
-      dstp_pixel32 = dstp_pixel32 + 16384; // half the bits of add64
-      dstp_pixel32 = dstp_pixel32 >> 15;
+      //dstp_pixel32 = dstp_pixel32 * div; // div = 32768/(planes+1)
+      //dstp_pixel32 = dstp_pixel32 + 16384; // half the bits of add64
+      //dstp_pixel32 = dstp_pixel32 >> 15; // division by 32768, throwing the remainder
+      // A different approach. Identical results to the original one.
+      dstp_pixel32 = (int32_t)((double)dstp_pixel32 / (planes + 1) + 0.5);
+
       /* Skip this.
        *
       // Clamp dstp_pixel32 to signed 16 bits.

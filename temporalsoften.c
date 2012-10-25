@@ -38,87 +38,7 @@ uint8_t ssub8(uint8_t a, uint8_t b) {
 
 // This function processes only one line. The dstp and srcp pointers are modified externally to point to the "current" line.
 // I'm not sure my translation of this function would do the right thing to rgb data. [...] I think it would.
-void there_is_only_c_accumulate_line_mode2(uint8_t* dstp, const uint8_t** srcp, int planes, int width, int threshold, int div) {
-   // dstp: pointer to the destination line. This gets "softened".
-   // srcp: array of pointers to the source lines.
-   // planes: the number of elements in the srcp array.
-   // width: width of a line.
-   // threshold: the luma or chroma threshold (whichever we're working on).
-   // div: seems to be 32768/(planes+1). Must be magic.
-
-
-   // loop over the pixels in dstp
-   // eax -> i
-   for (int i = 0; i < width; i++) { // testplane loop
-      // load 8 pixels from (dstp + i) into mm0
-      uint8_t dstp_pixel8 = dstp[i];
-      // unpack the lower 4 and interleave with zeroes in mm6
-      // unpack the higher 4 and interleave with zeroes in mm7
-      uint16_t dstp_pixel16 = dstp_pixel8;
-
-      // For some reason it wants to start with the last frame.
-      for (int j = planes - 1; j >= 0; j--) { // kernel_loop
-         const uint8_t* current_plane = srcp[j];
-         // load 8 pixels from (current_plane + i) into mm1
-         uint8_t current_plane_pixel = current_plane[i];
-
-         // subtract current_plane pixels from dstp pixels, saturate the result (0-255)
-         // subtract dstp pixels from current_plane pixels, saturate the result (0-255)
-         // bitwise OR the two results.
-         // in other words, absolute difference.
-         uint8_t absolute = abs(dstp_pixel8 - current_plane_pixel);
-         //uint8_t absolute = ssub8(dstp_pixel8, current_plane_pixel)
-         //                 | ssub8(current_plane_pixel, dstp_pixel8);
-
-         // subtract threshold from the absolute difference and saturate the result
-         // threshold fits in uint8_t.
-         uint8_t absolute_minus_threshold = ssub8(absolute, (uint8_t)threshold);
-         absolute_minus_threshold = (absolute_minus_threshold == 0) ? 255 : 0;
-         // current_plane_pixel & absolute_minus_threshold
-         // dstp_pixel & ~absolute_minus_threshold
-         // bitwise OR the two results above
-         // If the absolute difference is below or equal to threshold, the two pixels are similar enough, so current_plane_pixel is added to the sum and dstp_pixel8 is excluded.
-         // If the absolute difference is above threshold, dstp_pixel8 is added to the sum and current_plane_pixel is excluded.
-         uint16_t bitwise_or = (current_plane_pixel & absolute_minus_threshold)
-                             | (dstp_pixel8 & ~absolute_minus_threshold);
-         // unpack the lower 4 and interleave with zeroes
-         // add to mm6, saturate the result (0-65535)
-         // unpack the higher 4 and interleave with zeroes
-         // add to mm7, saturate the result (0-65535)
-         dstp_pixel16 = sadd16(dstp_pixel16, bitwise_or);
-      }
-      int32_t dstp_pixel32 = dstp_pixel16;
-#if 1
-      dstp_pixel32 = dstp_pixel32 * div; // div = 32768/(planes+1)
-      dstp_pixel32 = dstp_pixel32 + 16384; // half the bits of add64
-      dstp_pixel32 = dstp_pixel32 >> 15; // division by 32768, throwing the remainder
-#endif
-#if 0
-      // A different approach. Identical results to the original one.
-      dstp_pixel32 = (int32_t)((double)dstp_pixel32 / (planes + 1) + 0.5);
-#endif
-
-      /* Skip this.
-       *
-      // Clamp dstp_pixel32 to signed 16 bits.
-      if (dstp_pixel32 > 32767) {
-         dstp_pixel32 = 32767;
-      } else if (dstp_pixel32 < -32768) {
-         dstp_pixel32 = -32768;
-      }
-      */
-      // Clamp the result to unsigned 8 bits.
-      if (dstp_pixel32 > 255) {
-         dstp_pixel32 = 255;
-      } else if (dstp_pixel32 < 0) {
-         dstp_pixel32 = 0;
-      }
-      dstp[i] = (uint8_t)dstp_pixel32;
-   }
-}
-
-
-void there_is_only_c_accumulate_line_mode2_2(uint8_t* dstp, const uint8_t** srcp, int planes, int width, int threshold, int div, int half_div) {
+void there_is_only_c_accumulate_line_mode2(uint8_t* dstp, const uint8_t** srcp, int planes, int width, int threshold, int div, int half_div) {
    // dstp: pointer to the destination line. This gets "softened".
    // srcp: array of pointers to the source lines.
    // planes: the number of elements in the srcp array.
@@ -339,7 +259,7 @@ static const VSFrameRef *VS_CC temporalSoftenGetFrame(int n, int activationReaso
             // } else {
             //    there_is_only_c_accumulate_line_mode2(...);
             // }
-            there_is_only_c_accumulate_line_mode2_2(dstp, srcp, dd, w, current_threshold, c_div, half_c_div);
+            there_is_only_c_accumulate_line_mode2(dstp, srcp, dd, w, current_threshold, c_div, half_c_div);
 
             for (int i = 0; i < dd; i++) {
                srcp[i] += src_stride[i];

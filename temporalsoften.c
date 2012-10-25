@@ -118,19 +118,18 @@ void there_is_only_c_accumulate_line_mode2(uint8_t* dstp, const uint8_t** srcp, 
 }
 
 
-void there_is_only_c_accumulate_line_mode2_2(uint8_t* dstp, const uint8_t** srcp, int planes, int width, int threshold, int div) {
+void there_is_only_c_accumulate_line_mode2_2(uint8_t* dstp, const uint8_t** srcp, int planes, int width, int threshold, int div, int half_div) {
    // dstp: pointer to the destination line. This gets "softened".
    // srcp: array of pointers to the source lines.
    // planes: the number of elements in the srcp array.
    // width: width of a line.
    // threshold: the luma or chroma threshold (whichever we're working on).
-   // div: seems to be 32768/(planes+1). Must be magic.
+   // div: planes+1.
+   // half_div: (planes+1)/2.
 
 
    // loop over the pixels in dstp
-   // eax -> i
    for (int i = 0; i < width; i++) { // testplane loop
-      // load 8 pixels from (dstp + i) into mm0
       uint8_t dstp_pixel8 = dstp[i];
       uint32_t dstp_pixel32 = dstp_pixel8;
 
@@ -148,7 +147,9 @@ void there_is_only_c_accumulate_line_mode2_2(uint8_t* dstp, const uint8_t** srcp
          }
       }
       // A different approach. Identical results to the original one.
-      dstp_pixel32 = (uint32_t)((double)dstp_pixel32 / (planes + 1) + 0.5);
+      //dstp_pixel32 = (uint32_t)((double)dstp_pixel32 / (planes + 1) + 0.5);
+      // And without floating point:
+      dstp_pixel32 = (dstp_pixel32 + half_div) / div;
 
       // It should always fit in 8 bits so don't clamp.
 #if 0
@@ -325,7 +326,8 @@ static const VSFrameRef *VS_CC temporalSoftenGetFrame(int n, int activationReaso
             return dst;
          }
 
-         int c_div = 32768 / (dd + 1);
+         int c_div = dd + 1;
+         int half_c_div = c_div / 2;
 
          // There was a "if (current_threshold)" in the original at this point, but current_threshold can't be zero here.
          for (y = 0; y < h; y++) {
@@ -337,7 +339,7 @@ static const VSFrameRef *VS_CC temporalSoftenGetFrame(int n, int activationReaso
             // } else {
             //    there_is_only_c_accumulate_line_mode2(...);
             // }
-            there_is_only_c_accumulate_line_mode2_2(dstp, srcp, dd, w, current_threshold, c_div);
+            there_is_only_c_accumulate_line_mode2_2(dstp, srcp, dd, w, current_threshold, c_div, half_c_div);
 
             for (int i = 0; i < dd; i++) {
                srcp[i] += src_stride[i];

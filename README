@@ -1,0 +1,12 @@
+TemporalSoften filter for VapourSynth.
+
+This is a port of the internal Avisynth filter TemporalSoften.
+
+Only one mode is implemented because each mode requires decoding a function written in assembly and that's somewhat annoying. I picked mode 2 because QTGMC uses it.
+
+The filter's parameters are the same as in the original.
+
+To compile the filter:
+clang -Wall -Wextra -Wno-unused-parameter -shared -fPIC -o libtemporalsoften.so temporalsoften.c
+
+Currently tested only in Linux.

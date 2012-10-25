@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include <vapoursynth/VapourSynth.h>
 
+
 // Computes the sum of absolute differences between plane1 and plane2.
 int64_t there_is_only_c_scenechange(const uint8_t* plane1, const uint8_t* plane2, int height, int width, int stride1, int stride2) {
    int wp = (width / 32) * 32;
@@ -17,24 +18,6 @@ int64_t there_is_only_c_scenechange(const uint8_t* plane1, const uint8_t* plane2
    return sum;
 }
 
-
-// Saturated addition. Shamelessly stolen from stackoverflow.
-uint8_t sadd8(uint8_t a, uint8_t b) {
-   return (a > 0xFF - b) ? 0xFF : a + b;
-}
-
-uint16_t sadd16(uint16_t a, uint16_t b) {
-   return (a > 0xFFFF - b) ? 0xFFFF : a + b;
-}
-
-uint32_t sadd32(uint32_t a, uint32_t b) {
-   return (a > 0xFFFFFFFF - b) ? 0xFFFFFFFF : a + b;
-}
-
-// Saturated subtraction.
-uint8_t ssub8(uint8_t a, uint8_t b) {
-   return (b > a) ? 0 : a - b;
-}
 
 // This function processes only one line. The dstp and srcp pointers are modified externally to point to the "current" line.
 // I'm not sure my translation of this function would do the right thing to rgb data. [...] I think it would.

@@ -1,12 +1,32 @@
+Description
+===========
+
 TemporalSoften filter for VapourSynth.
 
 This is a port of the internal Avisynth filter TemporalSoften.
 
 Only one mode is implemented because each mode requires decoding a function written in assembly and that's somewhat annoying. I picked mode 2 because QTGMC uses it.
 
-The filter's parameters are the same as in the original.
 
-To compile the filter:
+Usage
+=====
+
+focus.TemporalSoften(clip clip, int radius, int luma_threshold, int chroma_threshold[, int scenechange=0, int mode=2])
+
+Allowed values (ranges are inclusive):
+- radius: 1..7
+- luma_threshold: 0..255
+- chroma_threshold: 0..255
+- scenechange: 0..254
+- mode: 2
+
+The two thresholds can't both be 0.
+
+
+Compilation
+===========
+
+To compile the filter in Linux (and possibly other Unix-like systems):
 clang -Wall -Wextra -Wno-unused-parameter -shared -fPIC -o libtemporalsoften.so temporalsoften.c
 
 Currently tested only in Linux.

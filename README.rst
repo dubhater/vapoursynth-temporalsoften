@@ -11,9 +11,12 @@ Only one mode is implemented because each mode requires decoding a function writ
 Usage
 =====
 
-focus.TemporalSoften(clip clip, int radius, int luma_threshold, int chroma_threshold[, int scenechange=0, int mode=2])
+::
+
+   focus.TemporalSoften(clip clip, int radius, int luma_threshold, int chroma_threshold[, int scenechange=0, int mode=2])
 
 Allowed values (ranges are inclusive):
+
 - radius: 1..7
 - luma_threshold: 0..255
 - chroma_threshold: 0..255
@@ -26,7 +29,8 @@ The two thresholds can't both be 0.
 Compilation
 ===========
 
-To compile the filter in Linux (and possibly other Unix-like systems):
-clang -Wall -Wextra -Wno-unused-parameter -shared -fPIC -o libtemporalsoften.so temporalsoften.c
+To compile the filter in Linux (and possibly other Unix-like systems)::
+
+   clang -Wall -Wextra -Wno-unused-parameter -shared -fPIC -o libtemporalsoften.so temporalsoften.c
 
 Currently tested only in Linux.

@@ -1,0 +1,3 @@
+*.so
+*.dll
+incomplete-and-mangled-original.cpp

@@ -226,6 +226,11 @@ static const VSFrameRef *VS_CC temporalSoftenGetFrame(int n, int activationReaso
          }
 
          if (dd < 1) {
+            // Always free the source frame(s) before returning.
+            for (int i = 0; i < d->radius * 2 + 1; i++) {
+               vsapi->freeFrame(src[i]);
+            }
+
             return dst;
          }
 

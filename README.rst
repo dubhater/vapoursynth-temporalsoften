@@ -33,4 +33,4 @@ To compile the filter in Linux (and possibly other Unix-like systems)::
 
    clang -Wall -Wextra -Wno-unused-parameter -shared -fPIC -o libtemporalsoften.so temporalsoften.c
 
-Currently tested only in Linux.
+A win32 dll can be found in the Downloads section.

@@ -295,9 +295,18 @@ static void VS_CC temporalSoftenCreate(const VSMap *in, VSMap *out, void *userDa
    }
 
    // Get the parameters.
-   d.radius = vsapi->propGetInt(in, "radius", 0, 0);
-   d.luma_threshold = vsapi->propGetInt(in, "luma_threshold", 0, 0);
-   d.chroma_threshold = vsapi->propGetInt(in, "chroma_threshold", 0, 0);
+   d.radius = vsapi->propGetInt(in, "radius", 0, &err);
+   if (err) {
+      d.radius = 4;
+   }
+   d.luma_threshold = vsapi->propGetInt(in, "luma_threshold", 0, &err);
+   if (err) {
+      d.luma_threshold = 4;
+   }
+   d.chroma_threshold = vsapi->propGetInt(in, "chroma_threshold", 0, &err);
+   if (err) {
+      d.chroma_threshold = 8;
+   }
    // Unused optional parameters default to 0,
    // which happens to be fine for scenechange.
    d.scenechange = vsapi->propGetInt(in, "scenechange", 0, &err);
@@ -357,6 +366,6 @@ static void VS_CC temporalSoftenCreate(const VSMap *in, VSMap *out, void *userDa
 
 VS_EXTERNAL_API(void) VapourSynthPluginInit(VSConfigPlugin configFunc, VSRegisterFunction registerFunc, VSPlugin *plugin) {
    configFunc("com.focus.temporalsoften", "focus", "VapourSynth TemporalSoften Filter", VAPOURSYNTH_API_VERSION, 1, plugin);
-   registerFunc("TemporalSoften", "clip:clip;radius:int;luma_threshold:int;chroma_threshold:int;scenechange:int:opt;mode:int:opt", temporalSoftenCreate, 0, plugin);
+   registerFunc("TemporalSoften", "clip:clip;radius:int:opt;luma_threshold:int:opt;chroma_threshold:int:opt;scenechange:int:opt;mode:int:opt", temporalSoftenCreate, 0, plugin);
 }
 

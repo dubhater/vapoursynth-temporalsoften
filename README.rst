@@ -13,7 +13,7 @@ Usage
 
 ::
 
-   focus.TemporalSoften(clip clip, int radius, int luma_threshold, int chroma_threshold[, int scenechange=0, int mode=2])
+   focus.TemporalSoften(clip clip[, int radius=4, int luma_threshold=4, int chroma_threshold=4, int scenechange=0, int mode=2])
 
 Allowed values (ranges are inclusive):
 

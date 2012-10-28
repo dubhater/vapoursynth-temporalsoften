@@ -355,7 +355,7 @@ static void VS_CC temporalSoftenCreate(const VSMap *in, VSMap *out, void *userDa
 }
 
 
-void VS_CC VapourSynthPluginInit(VSConfigPlugin configFunc, VSRegisterFunction registerFunc, VSPlugin *plugin) {
+VS_EXTERNAL_API(void) VapourSynthPluginInit(VSConfigPlugin configFunc, VSRegisterFunction registerFunc, VSPlugin *plugin) {
    configFunc("com.focus.temporalsoften", "focus", "VapourSynth TemporalSoften Filter", VAPOURSYNTH_API_VERSION, 1, plugin);
    registerFunc("TemporalSoften", "clip:clip;radius:int;luma_threshold:int;chroma_threshold:int;scenechange:int:opt;mode:int:opt", temporalSoftenCreate, 0, plugin);
 }

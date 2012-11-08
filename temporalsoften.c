@@ -155,17 +155,20 @@ static const VSFrameRef *VS_CC temporalSoftenGetFrame(int n, int activationReaso
       // Loop over all the planes
       int plane;
       for (plane = 0; plane < fi->numPlanes; plane++) {
-         if (plane == 0 && d->luma_threshold == 0) {
-            // Skip the luma plane if luma_threshold is 0.
-            continue;
-         }
-         if (plane == 1 && d->chroma_threshold == 0) {
-            // Skip the chroma planes if chroma_threshold is 0.
-            break;
-         }
+         if (fi->colorFamily != cmRGB) {
+            if (plane == 0 && d->luma_threshold == 0) {
+               // Skip the luma plane if luma_threshold is 0.
+               continue;
+            }
+            if (plane == 1 && d->chroma_threshold == 0) {
+               // Skip the chroma planes if chroma_threshold is 0.
+               break;
+            }
+         } // If it's RGB, process all planes.
          // ^ I like this better than the "planes[c++]" stuff in the original.
 
-         int current_threshold = (plane == 0) ? d->luma_threshold : d->chroma_threshold;
+         // Use luma_threshold for all planes when the input is RGB.
+         int current_threshold = (plane == 0 || fi->colorFamily == cmRGB) ? d->luma_threshold : d->chroma_threshold;
          int dd = 0;
          int src_stride[16];
          int src_stride_trimmed[16];
@@ -299,8 +302,11 @@ static void VS_CC temporalSoftenCreate(const VSMap *in, VSMap *out, void *userDa
    d.node = vsapi->propGetNode(in, "clip", 0, 0);
    d.vi = vsapi->getVideoInfo(d.node);
 
-   if (!d.vi->format || d.vi->format->sampleType != stInteger || d.vi->format->bitsPerSample > 16 || d.vi->format->colorFamily != cmYUV) {
-      vsapi->setError(out, "TemporalSoften: only constant format 8..16 bit integer YUV input supported");
+   if (!d.vi->format || d.vi->format->sampleType != stInteger
+                     || d.vi->format->bitsPerSample > 16
+                     || (d.vi->format->colorFamily != cmYUV && d.vi->format->colorFamily != cmRGB
+                                                            && d.vi->format->colorFamily != cmGray)) {
+      vsapi->setError(out, "TemporalSoften: only constant format 8..16 bit integer YUV, RGB, or Gray input supported");
       vsapi->freeNode(d.node);
       return;
    }
@@ -348,6 +354,19 @@ static void VS_CC temporalSoftenCreate(const VSMap *in, VSMap *out, void *userDa
    // With both thresholds at 0 TemporalSoften would do nothing to the frames.
    if (d.luma_threshold == 0 && d.chroma_threshold == 0) {
       vsapi->setError(out, "TemporalSoften: luma_threshold and chroma_threshold can't both be 0");
+      vsapi->freeNode(d.node);
+      return;
+   }
+
+   if (d.luma_threshold == 0 && (d.vi->format->colorFamily == cmRGB || d.vi->format->colorFamily == cmGray)) {
+      vsapi->setError(out, "TemporalSoften: luma_threshold must not be 0 when the input is RGB or Gray");
+      vsapi->freeNode(d.node);
+      return;
+   }
+
+   // FIXME: make scenechange work with RGB input.
+   if (d.scenechange > 0 && d.vi->format->colorFamily == cmRGB) {
+      vsapi->setError(out, "TemporalSoften: scenechange is not available with RGB input");
       vsapi->freeNode(d.node);
       return;
    }

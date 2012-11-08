@@ -3,15 +3,20 @@
 
 
 // Computes the sum of absolute differences between plane1 and plane2.
-int64_t there_is_only_c_scenechange(const uint8_t* plane1, const uint8_t* plane2, int height, int width, int stride1, int stride2) {
+uint64_t there_is_only_c_scenechange(const uint8_t* plane1, const uint8_t* plane2, int height, int width, int stride1, int stride2, int bps) {
    int wp = (width / 32) * 32;
    int hp = height;
 
    int x, y;
-   int64_t sum = 0;
+   uint64_t sum = 0;
    for (y = 0; y < hp; y++) {
       for (x = 0; x < wp; x++) {
-         int diff = abs(plane2[x + y * stride2] - plane1[x + y * stride1]);
+         int diff;
+         if (bps == 8) {
+            diff = abs(plane2[x + y * stride2] - plane1[x + y * stride1]);
+         } else {
+            diff = abs(((uint16_t*)plane2)[x + y * stride2 / 2] - ((uint16_t*)plane1)[x + y * stride1 / 2]);
+         }
          sum += diff;
       }
    }
@@ -21,49 +26,56 @@ int64_t there_is_only_c_scenechange(const uint8_t* plane1, const uint8_t* plane2
 
 // This function processes only one line. The dstp and srcp pointers are modified externally to point to the "current" line.
 // I'm not sure my translation of this function would do the right thing to rgb data. [...] I think it would.
-void there_is_only_c_accumulate_line_mode2(uint8_t* dstp, const uint8_t** srcp, int planes, int width, int threshold, int div, int half_div) {
+void there_is_only_c_accumulate_line_mode2(uint8_t* dstp, const uint8_t** srcp, int frames, int width, int threshold, int div, int half_div, int bps) {
    // dstp: pointer to the destination line. This gets "softened".
    // srcp: array of pointers to the source lines.
-   // planes: the number of elements in the srcp array.
+   // frames: the number of elements in the srcp array.
    // width: width of a line.
    // threshold: the luma or chroma threshold (whichever we're working on).
    // div: planes+1.
    // half_div: (planes+1)/2.
+   // bps: bits per pixel
 
 
-   // loop over the pixels in dstp
-   for (int i = 0; i < width; i++) { // testplane loop
-      uint8_t dstp_pixel8 = dstp[i];
-      uint32_t dstp_pixel32 = dstp_pixel8;
+   if (bps == 8) {
+      // loop over the pixels in dstp
+      for (int x = 0; x < width; x++) { // testplane loop
+         uint64_t sum = dstp[x];
 
-      // For some reason it wants to start with the last frame.
-      for (int j = planes - 1; j >= 0; j--) { // kernel_loop
-         const uint8_t* current_plane = srcp[j];
-         uint8_t current_plane_pixel = current_plane[i];
+         // For some reason it wants to start with the last frame.
+         for (int frame = frames - 1; frame >= 0; frame--) { // kernel_loop
+            uint8_t absolute = abs(dstp[x] - srcp[frame][x]);
 
-         uint8_t absolute = abs(dstp_pixel8 - current_plane_pixel);
-
-         if (absolute <= threshold) {
-            dstp_pixel32 += current_plane_pixel;
-         } else {
-            dstp_pixel32 += dstp_pixel8;
+            if (absolute <= threshold) {
+               sum += srcp[frame][x];
+            } else {
+               sum += dstp[x];
+            }
          }
-      }
-      // A different approach. Identical results to the original one.
-      //dstp_pixel32 = (uint32_t)((double)dstp_pixel32 / (planes + 1) + 0.5);
-      // And without floating point:
-      dstp_pixel32 = (dstp_pixel32 + half_div) / div;
 
-      // It should always fit in 8 bits so don't clamp.
-#if 0
-      // Clamp the result to unsigned 8 bits.
-      if (dstp_pixel32 > 255) {
-         dstp_pixel32 = 255;
-      } else if (dstp_pixel32 < 0) {
-         dstp_pixel32 = 0;
+         dstp[x] = (uint8_t)((sum + half_div) / div);
       }
-#endif
-      dstp[i] = (uint8_t)dstp_pixel32;
+   } else { // yay code duplication
+      uint16_t* dstp16 = (uint16_t*)dstp;
+      uint16_t** srcp16 = (uint16_t**)srcp;
+
+      // loop over the pixels in dstp
+      for (int x = 0; x < width; x++) { // testplane loop
+         uint64_t sum = dstp16[x];
+
+         // For some reason it wants to start with the last frame.
+         for (int frame = frames - 1; frame >= 0; frame--) { // kernel_loop
+            uint16_t absolute = abs(dstp16[x] - srcp16[frame][x]);
+
+            if (absolute <= threshold) {
+               sum += srcp16[frame][x];
+            } else {
+               sum += dstp16[x];
+            }
+         }
+
+         dstp16[x] = (uint16_t)((sum + half_div) / div);
+      }
    }
 }
 
@@ -83,7 +95,7 @@ typedef struct {
    int radius;
    int luma_threshold;
    int chroma_threshold;
-   int scenechange;
+   uint64_t scenechange;
    int mode;
 } TemporalSoftenData;
 
@@ -93,6 +105,12 @@ static void VS_CC temporalSoftenInit(VSMap *in, VSMap *out, void **instanceData,
    vsapi->setVideoInfo(d->vi, node);
 
    d->scenechange *= ((d->vi->width/32)*32) * d->vi->height;
+
+   int bps = d->vi->format->bitsPerSample;
+   // FIXME: perhaps don't do this.
+   d->luma_threshold   <<= bps - 8;
+   d->chroma_threshold <<= bps - 8;
+   d->scenechange      <<= bps - 8;
 }
 
 
@@ -187,7 +205,7 @@ static const VSFrameRef *VS_CC temporalSoftenGetFrame(int n, int activationReaso
 
             for (int i = d->radius - 1; i >= 0; i--) {
                if (!skiprest && !planeDisabled[i]) {
-                  int scenevalues = there_is_only_c_scenechange(dstp, srcp[i], h, w, dst_stride, src_stride[i]);
+                  uint64_t scenevalues = there_is_only_c_scenechange(dstp, srcp[i], h, w, dst_stride, src_stride[i], fi->bitsPerSample);
                   if (scenevalues < d->scenechange) {
                      src_stride_trimmed[dd2] = src_stride[i];
                      srcp_trimmed[dd2] = srcp[i];
@@ -204,7 +222,7 @@ static const VSFrameRef *VS_CC temporalSoftenGetFrame(int n, int activationReaso
 
             for (int i = 0; i < d->radius; i++) {
                if (!skiprest && !planeDisabled[i + d->radius]) {
-                  int scenevalues = there_is_only_c_scenechange(dstp, srcp[i + d->radius], h, w, dst_stride, src_stride[i + d->radius]);
+                  uint64_t scenevalues = there_is_only_c_scenechange(dstp, srcp[i + d->radius], h, w, dst_stride, src_stride[i + d->radius], fi->bitsPerSample);
                   if (scenevalues < d->scenechange) {
                      src_stride_trimmed[dd2] = src_stride[i + d->radius];
                      srcp_trimmed[dd2] = srcp[i + d->radius];
@@ -247,7 +265,7 @@ static const VSFrameRef *VS_CC temporalSoftenGetFrame(int n, int activationReaso
             // } else {
             //    there_is_only_c_accumulate_line_mode2(...);
             // }
-            there_is_only_c_accumulate_line_mode2(dstp, srcp, dd, w, current_threshold, c_div, half_c_div);
+            there_is_only_c_accumulate_line_mode2(dstp, srcp, dd, w, current_threshold, c_div, half_c_div, fi->bitsPerSample);
 
             for (int i = 0; i < dd; i++) {
                srcp[i] += src_stride[i];
@@ -288,8 +306,8 @@ static void VS_CC temporalSoftenCreate(const VSMap *in, VSMap *out, void *userDa
    d.node = vsapi->propGetNode(in, "clip", 0, 0);
    d.vi = vsapi->getVideoInfo(d.node);
 
-   if (!d.vi->format || d.vi->format->sampleType != stInteger || d.vi->format->bitsPerSample != 8 || d.vi->format->colorFamily != cmYUV) {
-      vsapi->setError(out, "TemporalSoften: only constant format 8bit integer YUV input supported");
+   if (!d.vi->format || d.vi->format->sampleType != stInteger || d.vi->format->bitsPerSample > 16 || d.vi->format->colorFamily != cmYUV) {
+      vsapi->setError(out, "TemporalSoften: only constant format 8..16 bit integer YUV input supported");
       vsapi->freeNode(d.node);
       return;
    }
@@ -341,7 +359,7 @@ static void VS_CC temporalSoftenCreate(const VSMap *in, VSMap *out, void *userDa
       return;
    }
 
-   if (d.scenechange < 0 || d.scenechange > 254) {
+   if (d.scenechange > 254) {
       vsapi->setError(out, "TemporalSoften: scenechange must be between 0 and 254 (inclusive)");
       vsapi->freeNode(d.node);
       return;

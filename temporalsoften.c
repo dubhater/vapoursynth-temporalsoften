@@ -80,13 +80,6 @@ void there_is_only_c_accumulate_line_mode2(uint8_t* dstp, const uint8_t** srcp, 
 }
 
 
-enum yuv_planes {
-   Y = 0,
-   U,
-   V
-};
-
-
 typedef struct {
    const VSNodeRef *node;
    const VSVideoInfo *vi;

@@ -81,7 +81,7 @@ void there_is_only_c_accumulate_line_mode2(uint8_t* dstp, const uint8_t** srcp, 
 
 
 typedef struct {
-   const VSNodeRef *node;
+   VSNodeRef *node;
    const VSVideoInfo *vi;
 
    // Filter parameters.
@@ -95,7 +95,7 @@ typedef struct {
 
 static void VS_CC temporalSoftenInit(VSMap *in, VSMap *out, void **instanceData, VSNode *node, VSCore *core, const VSAPI *vsapi) {
    TemporalSoftenData *d = (TemporalSoftenData *) * instanceData;
-   vsapi->setVideoInfo(d->vi, node);
+   vsapi->setVideoInfo(d->vi, 1, node);
 
    d->scenechange *= ((d->vi->width/32)*32) * d->vi->height;
 
@@ -295,7 +295,6 @@ static void VS_CC temporalSoftenFree(void *instanceData, VSCore *core, const VSA
 static void VS_CC temporalSoftenCreate(const VSMap *in, VSMap *out, void *userData, VSCore *core, const VSAPI *vsapi) {
    TemporalSoftenData d;
    TemporalSoftenData *data;
-   const VSNodeRef *cref;
    int err;
 
    // Get a clip reference from the input arguments. This must be freed later.
@@ -387,9 +386,7 @@ static void VS_CC temporalSoftenCreate(const VSMap *in, VSMap *out, void *userDa
    data = malloc(sizeof(d));
    *data = d;
 
-   cref = vsapi->createFilter(in, out, "TemporalSoften", temporalSoftenInit, temporalSoftenGetFrame, temporalSoftenFree, fmParallel, 0, data, core);
-   vsapi->propSetNode(out, "clip", cref, 0);
-   vsapi->freeNode(cref);
+   vsapi->createFilter(in, out, "TemporalSoften", temporalSoftenInit, temporalSoftenGetFrame, temporalSoftenFree, fmParallel, 0, data, core);
    return;
 }
 

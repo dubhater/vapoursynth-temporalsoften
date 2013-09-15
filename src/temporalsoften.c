@@ -1,5 +1,6 @@
 #include <stdlib.h>
-#include <vapoursynth/VapourSynth.h>
+
+#include <VapourSynth.h>
 
 
 // Computes the sum of absolute differences between plane1 and plane2.

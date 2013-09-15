@@ -36,14 +36,15 @@ void there_is_only_c_accumulate_line_mode2(uint8_t* dstp, const uint8_t** srcp, 
    // half_div: (planes+1)/2.
    // bps: bits per pixel
 
+   int x, frame;
 
    if (bps == 8) {
       // loop over the pixels in dstp
-      for (int x = 0; x < width; x++) { // testplane loop
+      for (x = 0; x < width; x++) { // testplane loop
          uint64_t sum = dstp[x];
 
          // For some reason it wants to start with the last frame.
-         for (int frame = frames - 1; frame >= 0; frame--) { // kernel_loop
+         for (frame = frames - 1; frame >= 0; frame--) { // kernel_loop
             uint8_t absolute = abs(dstp[x] - srcp[frame][x]);
 
             if (absolute <= threshold) {
@@ -60,11 +61,11 @@ void there_is_only_c_accumulate_line_mode2(uint8_t* dstp, const uint8_t** srcp, 
       uint16_t** srcp16 = (uint16_t**)srcp;
 
       // loop over the pixels in dstp
-      for (int x = 0; x < width; x++) { // testplane loop
+      for (x = 0; x < width; x++) { // testplane loop
          uint64_t sum = dstp16[x];
 
          // For some reason it wants to start with the last frame.
-         for (int frame = frames - 1; frame >= 0; frame--) { // kernel_loop
+         for (frame = frames - 1; frame >= 0; frame--) { // kernel_loop
             uint16_t absolute = abs(dstp16[x] - srcp16[frame][x]);
 
             if (absolute <= threshold) {
@@ -121,24 +122,27 @@ static const VSFrameRef *VS_CC temporalSoftenGetFrame(int n, int activationReaso
    TemporalSoftenData *d = (TemporalSoftenData *) * instanceData;
 
    if (activationReason == arInitial) {
+      int i, first, last;
+
       // Avoid requesting the first and last frames several times.
-      int first = n - d->radius;
+      first = n - d->radius;
       if (first < 0)
          first = 0;
 
-      int last = n + d->radius;
+      last = n + d->radius;
       if (last > d->vi->numFrames - 1)
          last = d->vi->numFrames - 1;
 
       // Request the frames.
-      for (int i = first; i <= last; i++) {
+      for (i = first; i <= last; i++) {
          vsapi->requestFrameFilter(i, d->node, frameCtx);
       }
    } else if (activationReason == arAllFramesReady) {
+      int i, plane;
       // Not sure why 16... the most we can have is 7*2+1
       const VSFrameRef* src[16];
       // Get the frames.
-      for (int i = n - d->radius; i <= n + d->radius; i++) {
+      for (i = n - d->radius; i <= n + d->radius; i++) {
          src[i - n + d->radius] = vsapi->getFrameFilter(min(d->vi->numFrames - 1, max(i, 0)), d->node, frameCtx);
       }
       
@@ -153,7 +157,6 @@ static const VSFrameRef *VS_CC temporalSoftenGetFrame(int n, int activationReaso
 
       // It's processing loop time!
       // Loop over all the planes
-      int plane;
       for (plane = 0; plane < fi->numPlanes; plane++) {
          if (fi->colorFamily != cmRGB) {
             if (plane == 0 && d->luma_threshold == 0) {
@@ -176,12 +179,12 @@ static const VSFrameRef *VS_CC temporalSoftenGetFrame(int n, int activationReaso
          const uint8_t *srcp_trimmed[16];
 
          // Get the plane pointers and strides.
-         for (int i = 0; i < d->radius; i++) {
+         for (i = 0; i < d->radius; i++) {
             src_stride[dd] = vsapi->getStride(src[i], plane);
             srcp[dd] = vsapi->getReadPtr(src[i], plane);
             dd++;
          }
-         for (int i = 1; i <= d->radius; i++) {
+         for (i = 1; i <= d->radius; i++) {
             src_stride[dd] = vsapi->getStride(src[d->radius + i], plane);
             srcp[dd] = vsapi->getReadPtr(src[d->radius + i], plane);
             dd++;
@@ -199,7 +202,7 @@ static const VSFrameRef *VS_CC temporalSoftenGetFrame(int n, int activationReaso
             int dd2 = 0;
             int skiprest = 0;
 
-            for (int i = d->radius - 1; i >= 0; i--) {
+            for (i = d->radius - 1; i >= 0; i--) {
                if (!skiprest && !planeDisabled[i]) {
                   uint64_t scenevalues = there_is_only_c_scenechange(dstp, srcp[i], h, w, dst_stride, src_stride[i], fi->bitsPerSample);
                   if (scenevalues < d->scenechange) {
@@ -216,7 +219,7 @@ static const VSFrameRef *VS_CC temporalSoftenGetFrame(int n, int activationReaso
             }
             skiprest = 0;
 
-            for (int i = 0; i < d->radius; i++) {
+            for (i = 0; i < d->radius; i++) {
                if (!skiprest && !planeDisabled[i + d->radius]) {
                   uint64_t scenevalues = there_is_only_c_scenechange(dstp, srcp[i + d->radius], h, w, dst_stride, src_stride[i + d->radius], fi->bitsPerSample);
                   if (scenevalues < d->scenechange) {
@@ -232,7 +235,7 @@ static const VSFrameRef *VS_CC temporalSoftenGetFrame(int n, int activationReaso
                }
             }
 
-            for (int i = 0; i < dd2; i++) {
+            for (i = 0; i < dd2; i++) {
                srcp[i] = srcp_trimmed[i];
                src_stride[i] = src_stride_trimmed[i];
             }
@@ -241,7 +244,7 @@ static const VSFrameRef *VS_CC temporalSoftenGetFrame(int n, int activationReaso
 
          if (dd < 1) {
             // Always free the source frame(s) before returning.
-            for (int i = 0; i < d->radius * 2 + 1; i++) {
+            for (i = 0; i < d->radius * 2 + 1; i++) {
                vsapi->freeFrame(src[i]);
             }
 
@@ -263,7 +266,7 @@ static const VSFrameRef *VS_CC temporalSoftenGetFrame(int n, int activationReaso
             // }
             there_is_only_c_accumulate_line_mode2(dstp, srcp, dd, w, current_threshold, c_div, half_c_div, fi->bitsPerSample);
 
-            for (int i = 0; i < dd; i++) {
+            for (i = 0; i < dd; i++) {
                srcp[i] += src_stride[i];
             }
             dstp += dst_stride;
@@ -272,7 +275,7 @@ static const VSFrameRef *VS_CC temporalSoftenGetFrame(int n, int activationReaso
 
 
       // Release the source frames.
-      for (int i = 0; i < d->radius * 2 + 1; i++) {
+      for (i = 0; i < d->radius * 2 + 1; i++) {
          vsapi->freeFrame(src[i]);
       }
 
